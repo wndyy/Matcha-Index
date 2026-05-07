@@ -1,12 +1,11 @@
 """
 Discover cafes in a given neighbourhood using Google Places API (New).
-Outputs: cafes.csv with one row per cafe.
+Outputs: cafes.csv with one row per cafe (chains excluded).
 
 Usage:
     python discover_cafes.py "Mount Pleasant" 49.2647 -123.1009 1500
     # args: neighbourhood_name, lat, lng, radius_meters
 """
-
 import csv
 import os
 import sys
@@ -34,6 +33,29 @@ FIELD_MASK = ",".join([
 # Search keywords. We do separate calls because Places caps results at 20 per
 # call and 'cafe' alone misses tea-focused spots.
 KEYWORDS = ["matcha", "cafe", "coffee", "tea"]
+
+# Chain stores to exclude. Lowercase, substring match against cafe name.
+# Add to this list as you find more chains in your data.
+CHAIN_BLOCKLIST = {
+    "mcdonald's",
+    "mcdonalds",
+    "starbucks",
+    "tim hortons",
+    "blenz",
+    "waves coffee",
+    "a&w",
+    "subway",
+    "second cup",
+    "7-eleven",
+    "shell",
+    "esso",
+}
+
+
+def is_chain(name: str) -> bool:
+    """True if cafe name matches a known chain."""
+    n = name.lower().strip()
+    return any(chain in n for chain in CHAIN_BLOCKLIST)
 
 
 def search_nearby(lat: float, lng: float, radius: float, keyword: str) -> list[dict]:
@@ -85,6 +107,7 @@ def main():
     radius = float(sys.argv[4])
 
     seen: dict[str, dict] = {}  # place_id -> normalized cafe
+    skipped_chains = 0
 
     for kw in KEYWORDS:
         print(f"Searching '{kw}'...")
@@ -93,13 +116,22 @@ def main():
         except requests.HTTPError as e:
             print(f"  ERROR: {e.response.status_code} {e.response.text}")
             continue
+
         for p in places:
             if p.get("businessStatus") and p["businessStatus"] != "OPERATIONAL":
                 continue  # skip closed/temporarily closed
             cafe = normalize(p, neighbourhood)
+            if is_chain(cafe["name"]):
+                skipped_chains += 1
+                continue  # skip chains
             seen[cafe["place_id"]] = cafe
+
         print(f"  got {len(places)} (total unique: {len(seen)})")
         time.sleep(0.5)  # be nice
+
+    if not seen:
+        print("\nNo cafes found.")
+        return
 
     out_path = Path("cafes.csv")
     write_header = not out_path.exists()
@@ -111,6 +143,8 @@ def main():
             writer.writerow(cafe)
 
     print(f"\nWrote {len(seen)} cafes to {out_path.resolve()}")
+    if skipped_chains:
+        print(f"Skipped {skipped_chains} chain results.")
 
 
 if __name__ == "__main__":
