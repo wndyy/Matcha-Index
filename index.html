@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Main Street, Vancouver — Matcha Index</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 40px 20px;
+    background: #EFF4F9;
+    font-family: Georgia, 'Times New Roman', serif;
+    color: #5A7A95;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  h1 {
+    font-size: 36px;
+    font-weight: 500;
+    letter-spacing: 4px;
+    margin: 0 0 8px 0;
+    text-transform: uppercase;
+  }
+  .subtitle {
+    font-size: 14px;
+    letter-spacing: 2px;
+    opacity: 0.7;
+    margin-bottom: 32px;
+  }
+
+  .map-container {
+    position: relative;
+    width: 100%;
+    max-width: 720px;
+    aspect-ratio: 1 / 1;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(90, 122, 149, 0.15);
+  }
+  .map-background { width: 100%; height: 100%; display: block; }
+  .marker-layer { position: absolute; inset: 0; pointer-events: none; }
+  .marker-layer .marker {
+    position: absolute;
+    width: 70px;
+    transform: translate(-50%, -85%);
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    pointer-events: auto;
+    cursor: pointer;
+  }
+  .marker:hover {
+    transform: translate(-50%, -85%) scale(1.15);
+    z-index: 10;
+  }
+  .marker .tooltip {
+    position: absolute;
+    bottom: 110%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #FFFFFF;
+    color: #5A7A95;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(90, 122, 149, 0.2);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .marker:hover .tooltip { opacity: 1; }
+
+  .controls {
+    margin-top: 32px;
+    width: 100%;
+    max-width: 720px;
+    text-align: center;
+  }
+  .slider-label {
+    font-size: 16px;
+    letter-spacing: 2px;
+    margin-bottom: 16px;
+  }
+  .slider-value {
+    font-size: 28px;
+    font-weight: 600;
+    color: #8B4A5C;
+    margin-bottom: 8px;
+  }
+  input[type="range"] {
+    width: 100%;
+    max-width: 500px;
+    accent-color: #E89BAB;
+  }
+  .marker-count {
+    margin-top: 12px;
+    font-size: 14px;
+    opacity: 0.7;
+  }
+
+  .averages {
+    margin-top: 32px;
+    display: flex;
+    gap: 40px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .avg-card {
+    background: #FFFFFF;
+    border-radius: 16px;
+    padding: 20px 32px;
+    min-width: 180px;
+    box-shadow: 0 4px 16px rgba(90, 122, 149, 0.1);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .avg-card .icon { width: 48px; height: 48px; }
+  .avg-card .label {
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    opacity: 0.7;
+  }
+  .avg-card .value {
+    font-size: 28px;
+    font-weight: 600;
+    color: #8B4A5C;
+    font-variant-numeric: tabular-nums;
+  }
+</style>
+</head>
+<body>
+
+<h1>Main Street, Vancouver</h1>
+<div class="subtitle">MATCHA &nbsp;·&nbsp; COFFEE</div>
+
+<div class="map-container">
+  <svg class="map-background" viewBox="0 0 1200 1200" preserveAspectRatio="xMidYMid slice"
+       xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="1200" fill="#D6E4F0"/>
+    <rect x="540" y="0" width="120" height="1200" fill="#A8C5DC"/>
+    <rect x="0" y="540" width="1200" height="120" fill="#A8C5DC"/>
+    <line x1="540" y1="0" x2="540" y2="1200" stroke="#8AAFCB" stroke-width="2"/>
+    <line x1="660" y1="0" x2="660" y2="1200" stroke="#8AAFCB" stroke-width="2"/>
+    <line x1="0" y1="540" x2="1200" y2="540" stroke="#8AAFCB" stroke-width="2"/>
+    <line x1="0" y1="660" x2="1200" y2="660" stroke="#8AAFCB" stroke-width="2"/>
+    <text x="600" y="600" font-family="Georgia, serif" font-size="22" font-weight="500"
+          letter-spacing="12" fill="#5A7A95" text-anchor="middle" dominant-baseline="middle"
+          transform="rotate(-90, 600, 600)">MAIN ST</text>
+    <text x="220" y="600" font-family="Georgia, serif" font-size="22" font-weight="500"
+          letter-spacing="3" fill="#5A7A95" text-anchor="middle" dominant-baseline="middle">
+      E KING EDWARD AVE
+    </text>
+  </svg>
+  <div class="marker-layer" id="markerLayer"></div>
+</div>
+
+<div class="controls">
+  <div class="slider-label">YEAR</div>
+  <div class="slider-value" id="yearValue">2026</div>
+  <input type="range" id="yearSlider" min="2015" max="2026" step="1" value="2026">
+  <div class="marker-count" id="markerCount"></div>
+</div>
+
+<div class="averages">
+  <div class="avg-card">
+    <svg class="icon" viewBox="0 0 110 120" xmlns="http://www.w3.org/2000/svg">
+      <path d="M 25 50 L 30 95 Q 30 100 35 100 L 65 100 Q 70 100 70 95 L 75 50 Z"
+            fill="#F5E6D3" stroke="#8B6F47" stroke-width="2.5" stroke-linejoin="round"/>
+      <ellipse cx="50" cy="50" rx="25" ry="5" fill="#FFFFFF" stroke="#8B6F47" stroke-width="2.5"/>
+      <ellipse cx="50" cy="50" rx="21" ry="3.5" fill="#A8C97F"/>
+      <path d="M 75 60 Q 88 60 88 72 Q 88 84 75 84"
+            fill="none" stroke="#8B6F47" stroke-width="2.5" stroke-linecap="round"/>
+    </svg>
+    <div class="label">Avg Matcha</div>
+    <div class="value" id="avgMatcha">$—</div>
+  </div>
+
+  <div class="avg-card">
+    <svg class="icon" viewBox="0 0 110 120" xmlns="http://www.w3.org/2000/svg">
+      <path d="M 25 50 L 30 95 Q 30 100 35 100 L 65 100 Q 70 100 70 95 L 75 50 Z"
+            fill="#FFFFFF" stroke="#5C3A1E" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M 28 70 L 72 70 L 70 82 L 30 82 Z"
+            fill="#C89070" stroke="#5C3A1E" stroke-width="2" stroke-linejoin="round"/>
+      <ellipse cx="50" cy="50" rx="25" ry="5" fill="#3D2817" stroke="#5C3A1E" stroke-width="2.5"/>
+      <ellipse cx="50" cy="50" rx="21" ry="3.5" fill="#4A2C18"/>
+    </svg>
+    <div class="label">Avg Coffee</div>
+    <div class="value" id="avgCoffee">$—</div>
+  </div>
+</div>
+
+<script>
+  // ============================================================
+  // YOUR REAL DATA — pasted from your CSV
+  // To update prices: edit this array, save, push to GitHub.
+  // ============================================================
+  const PRICE_DATA = [
+  {
+    "placeId": "ChIJ7RQhju9zhlQR2Z0mfE2A_2E",
+    "name": "The Mighty Oak",
+    "coffee": 2.5,
+    "matcha": null,
+    "date": "2015-02-01"
+  },
+  {
+    "placeId": "ChIJyzUSdeNzhlQRkz3zRrw73Ow",
+    "name": "JJ Bean Coffee Roasters",
+    "coffee": 2.0,
+    "matcha": null,
+    "date": "2017-07-01"
+  },
+  {
+    "placeId": "ChIJrZUaoOFzhlQRm9cwZS-mgso",
+    "name": "The Federal Store Luncheonette & Grocer",
+    "coffee": 3.0,
+    "matcha": 4.75,
+    "date": "2018-04-01"
+  },
+  {
+    "placeId": "ChIJL7wlu-NzhlQR_WJtTl2Njvw",
+    "name": "54th Parallel Caf\u00e9 & Lucky's Doughnuts - Main Street",
+    "coffee": 2.35,
+    "matcha": null,
+    "date": "2018-12-01"
+  },
+  {
+    "placeId": "ChIJNdmgdPdzhlQRPR6J87ewKck",
+    "name": "Trafiq Cafe & Bakery",
+    "coffee": 1.95,
+    "matcha": null,
+    "date": "2019-11-01"
+  },
+  {
+    "placeId": "ChIJyzUSdeNzhlQRkz3zRrw73Ow",
+    "name": "JJ Bean Coffee Roasters",
+    "coffee": 2.5,
+    "matcha": 3.0,
+    "date": "2020-02-01"
+  },
+  {
+    "placeId": "ChIJL7wlu-NzhlQR_WJtTl2Njvw",
+    "name": "53rd Parallel Caf\u00e9 & Lucky's Doughnuts - Main Street",
+    "coffee": 3.35,
+    "matcha": null,
+    "date": "2020-03-01"
+  },
+  {
+    "placeId": "ChIJ7yPsb0ZzhlQRNImVVhLe8tE",
+    "name": "Thierry Mount Pleasant",
+    "coffee": 3.35,
+    "matcha": null,
+    "date": "2021-01-01"
+  },
+  {
+    "placeId": "ChIJO5zViwd0hlQRAFFNbhunA8Q",
+    "name": "Le March\u00e9 St. George",
+    "coffee": 2.98,
+    "matcha": 3.5,
+    "date": "2021-05-01"
+  },
+  {
+    "placeId": "ChIJtZ1vTmVzhlQRKYtkWL3vwHs",
+    "name": "Foglifter Coffee Roasters",
+    "coffee": 2.4,
+    "matcha": 5.5,
+    "date": "2021-07-01"
+  },
+  {
+    "placeId": "ChIJtZ1vTmVzhlQRKYtkWL3vwHs",
+    "name": "Foglifter Coffee Roasters",
+    "coffee": 2.4,
+    "matcha": 5.5,
+    "date": "2021-08-01"
+  },
+  {
+    "placeId": "ChIJ7RQhju9zhlQR2Z0mfE2A_2E",
+    "name": "The Mighty Oak",
+    "coffee": 3.25,
+    "matcha": 5.95,
+    "date": "2021-09-01"
+  },
+  {
+    "placeId": "ChIJO5zViwd0hlQRAFFNbhunA8Q",
+    "name": "Le March\u00e9 St. George",
+    "coffee": null,
+    "matcha": 3.65,
+    "date": "2021-10-01"
+  },
+  {
+    "placeId": "ChIJ7yPsb0ZzhlQRNImVVhLe8tE",
+    "name": "Thierry Mount Pleasant",
+    "coffee": 3.5,
+    "matcha": null,
+    "date": "2021-12-01"
+  },
+  {
+    "placeId": "ChIJl9I8XuNzhlQRAQr1-4RURPk",
+    "name": "Caffe Mira",
+    "coffee": 2.55,
+    "matcha": 4.85,
+    "date": "2022-02-01"
+  },
+  {
+    "placeId": "ChIJL7wlu-NzhlQR_WJtTl2Njvw",
+    "name": "52nd Parallel Caf\u00e9 & Lucky's Doughnuts - Main Street",
+    "coffee": 2.8,
+    "matcha": null,
+    "date": "2022-06-01"
+  },
+  {
+    "placeId": "ChIJsfgDqXtzhlQROoYf0PVhqPw",
+    "name": "Forecast Coffee",
+    "coffee": 3.25,
+    "matcha": 4.5,
+    "date": "2022-06-01"
+  },
+  {
+    "placeId": "ChIJR7sAXvdzhlQRSt1ypOZngjM",
+    "name": "Aperture Coffee Bar",
+    "coffee": 3.25,
+    "matcha": 4.75,
+    "date": "2022-07-01"
+  },
+  {
+    "placeId": "ChIJNdmgdPdzhlQRPR6J87ewKck",
+    "name": "Trafiq Cafe & Bakery",
+    "coffee": 2.75,
+    "matcha": null,
+    "date": "2022-07-01"
+  },
+  {
+    "placeId": "ChIJtZ1vTmVzhlQRKYtkWL3vwHs",
+    "name": "Foglifter Coffee Roasters",
+    "coffee": 2.7,
+    "matcha": 6.05,
+    "date": "2022-07-01"
+  },
+  {
+    "placeId": "ChIJl9I8XuNzhlQRAQr1-4RURPk",
+    "name": "Caffe Mira",
+    "coffee": null,
+    "matcha": 5.45,
+    "date": "2022-08-01"
+  },
+  {
+    "placeId": "ChIJL7wlu-NzhlQR_WJtTl2Njvw",
+    "name": "50th Parallel Caf\u00e9 & Lucky's Doughnuts - Main Street",
+    "coffee": 2.9,
+    "matcha": null,
+    "date": "2022-10-01"
+  },
+  {
+    "placeId": "ChIJ9emgfTZ1hlQRRUCs6rHblkM",
+    "name": "Breka Bakery & Caf\u00e9 - Main st",
+    "coffee": 2.5,
+    "matcha": null,
+    "date": "2022-11-01"
+  },
+  {
+    "placeId": "ChIJtZ1vTmVzhlQRKYtkWL3vwHs",
+    "name": "Foglifter Coffee Roasters",
+    "coffee": 2.7,
+    "matcha": 6.05,
+    "date": "2023-03-01"
+  },
+  {
+    "placeId": "ChIJL7wlu-NzhlQR_WJtTl2Njvw",
+    "name": "51st Parallel Caf\u00e9 & Lucky's Doughnuts - Main Street",
+    "coffee": 3.0,
+    "matcha": null,
+    "date": "2023-04-01"
+  },
+  {
+    "placeId": "ChIJsfgDqXtzhlQROoYf0PVhqPw",
+    "name": "Forecast Coffee",
+    "coffee": 3.75,
+    "matcha": 5.0,
+    "date": "2023-04-01"
+  },
+  {
+    "placeId": "ChIJixK5WvpzhlQREm9WCjjDUbY",
+    "name": "Liberty Bakery + Caf\u00e9",
+    "coffee": 2.5,
+    "matcha": 5.25,
+    "date": "2023-04-01"
+  },
+  {
+    "placeId": "ChIJ7RQhju9zhlQR2Z0mfE2A_2E",
+    "name": "The Mighty Oak",
+    "coffee": 3.75,
+    "matcha": 6.25,
+    "date": "2023-08-01"
+  },
+  {
+    "placeId": "ChIJ7yPsb0ZzhlQRNImVVhLe8tE",
+    "name": "Thierry Mount Pleasant",
+    "coffee": 3.95,
+    "matcha": 4.5,
+    "date": "2023-10-01"
+  },
+  {
+    "placeId": "ChIJtZ1vTmVzhlQRKYtkWL3vwHs",
+    "name": "Foglifter Coffee Roasters",
+    "coffee": 2.95,
+    "matcha": 6.65,
+    "date": "2023-10-01"
+  },
+  {
+    "placeId": "ChIJ7yPsb0ZzhlQRNImVVhLe8tE",
+    "name": "Thierry Mount Pleasant",
+    "coffee": 4.45,
+    "matcha": 4.95,
+    "date": "2024-05-01"
+  },
+  {
+    "placeId": "ChIJl9I8XuNzhlQRAQr1-4RURPk",
+    "name": "Caffe Mira",
+    "coffee": 2.65,
+    "matcha": 5.65,
+    "date": "2024-05-01"
+  },
+  {
+    "placeId": "ChIJ7RQhju9zhlQR2Z0mfE2A_2E",
+    "name": "The Mighty Oak",
+    "coffee": 3.75,
+    "matcha": 6.25,
+    "date": "2024-05-01"
+  },
+  {
+    "placeId": "ChIJO5zViwd0hlQRAFFNbhunA8Q",
+    "name": "Le March\u00e9 St. George",
+    "coffee": 3.0,
+    "matcha": 4.75,
+    "date": "2024-06-01"
+  },
+  {
+    "placeId": "ChIJyzUSdeNzhlQRkz3zRrw73Ow",
+    "name": "JJ Bean Coffee Roasters",
+    "coffee": 3.05,
+    "matcha": 5.2,
+    "date": "2024-07-01"
+  },
+  {
+    "placeId": "ChIJ7RQhju9zhlQR2Z0mfE2A_2E",
+    "name": "The Mighty Oak",
+    "coffee": 3.9,
+    "matcha": 6.25,
+    "date": "2024-07-01"
+  },
+  {
+    "placeId": "ChIJl9I8XuNzhlQRAQr1-4RURPk",
+    "name": "Caffe Mira",
+    "coffee": 3.0,
+    "matcha": 5.8,
+    "date": "2024-10-01"
+  },
+  {
+    "placeId": "ChIJmaXZ_KhxhlQRLi-vU-PIKUw",
+    "name": "Mercato di Luigi Mount Pleasant",
+    "coffee": 3.0,
+    "matcha": null,
+    "date": "2024-10-01"
+  },
+  {
+    "placeId": "ChIJNdmgdPdzhlQRPR6J87ewKck",
+    "name": "Trafiq Cafe & Bakery",
+    "coffee": 3.75,
+    "matcha": null,
+    "date": "2024-11-01"
+  },
+  {
+    "placeId": "ChIJtZ1vTmVzhlQRKYtkWL3vwHs",
+    "name": "Foglifter Coffee Roasters",
+    "coffee": 3.1,
+    "matcha": 7.0,
+    "date": "2024-11-01"
+  },
+  {
+    "placeId": "ChIJsfgDqXtzhlQROoYf0PVhqPw",
+    "name": "Forecast Coffee",
+    "coffee": 4.0,
+    "matcha": 6.2,
+    "date": "2025-01-01"
+  },
+  {
+    "placeId": "ChIJIboWjC5zhlQR_gjGB_hf8to",
+    "name": "Mishmish",
+    "coffee": 3.0,
+    "matcha": null,
+    "date": "2025-01-01"
+  },
+  {
+    "placeId": "ChIJn-m1c5lzhlQRzCO9ALp_kFA",
+    "name": "Slo Coffee Fraser St.",
+    "coffee": 3.5,
+    "matcha": 6.05,
+    "date": "2025-02-01"
+  },
+  {
+    "placeId": "ChIJ7RQhju9zhlQR2Z0mfE2A_2E",
+    "name": "The Mighty Oak",
+    "coffee": 3.9,
+    "matcha": 6.25,
+    "date": "2025-02-01"
+  },
+  {
+    "placeId": "ChIJtZ1vTmVzhlQRKYtkWL3vwHs",
+    "name": "Foglifter Coffee Roasters",
+    "coffee": 3.1,
+    "matcha": 7.0,
+    "date": "2025-03-01"
+  },
+  {
+    "placeId": "ChIJR7sAXvdzhlQRSt1ypOZngjM",
+    "name": "Aperture Coffee Bar",
+    "coffee": 3.75,
+    "matcha": 5.25,
+    "date": "2025-04-01"
+  },
+  {
+    "placeId": "ChIJL7wlu-NzhlQR_WJtTl2Njvw",
+    "name": "49th Parallel Caf\u00e9 & Lucky's Doughnuts - Main Street",
+    "coffee": 3.5,
+    "matcha": null,
+    "date": "2025-06-01"
+  },
+  {
+    "placeId": "ChIJrZUaoOFzhlQRm9cwZS-mgso",
+    "name": "The Federal Store Luncheonette & Grocer",
+    "coffee": 3.25,
+    "matcha": 5.75,
+    "date": "2025-06-01"
+  },
+  {
+    "placeId": "ChIJ9emgfTZ1hlQRRUCs6rHblkM",
+    "name": "Breka Bakery & Caf\u00e9 - Main st",
+    "coffee": 2.75,
+    "matcha": 4.5,
+    "date": "2025-07-01"
+  },
+  {
+    "placeId": "ChIJO5zViwd0hlQRAFFNbhunA8Q",
+    "name": "Le March\u00e9 St. George",
+    "coffee": 3.25,
+    "matcha": 5.75,
+    "date": "2025-07-01"
+  },
+  {
+    "placeId": "ChIJNdmgdPdzhlQRPR6J87ewKck",
+    "name": "Trafiq Cafe & Bakery",
+    "coffee": 4.5,
+    "matcha": null,
+    "date": "2025-08-01"
+  },
+  {
+    "placeId": "ChIJIboWjC5zhlQR_gjGB_hf8to",
+    "name": "Mishmish",
+    "coffee": 3.5,
+    "matcha": null,
+    "date": "2025-08-01"
+  },
+  {
+    "placeId": "ChIJl9I8XuNzhlQRAQr1-4RURPk",
+    "name": "Caffe Mira",
+    "coffee": 3.0,
+    "matcha": 6.2,
+    "date": "2025-09-01"
+  },
+  {
+    "placeId": "ChIJn-m1c5lzhlQRzCO9ALp_kFA",
+    "name": "Slo Coffee Fraser St.",
+    "coffee": 3.65,
+    "matcha": 7.0,
+    "date": "2025-12-01"
+  },
+  {
+    "placeId": "ChIJmaXZ_KhxhlQRLi-vU-PIKUw",
+    "name": "Mercato di Luigi Mount Pleasant",
+    "coffee": 3.0,
+    "matcha": null,
+    "date": "2026-01-01"
+  },
+  {
+    "placeId": "ChIJ9emgfTZ1hlQRRUCs6rHblkM",
+    "name": "Breka Bakery & Caf\u00e9 - Main st",
+    "coffee": 3.0,
+    "matcha": 4.75,
+    "date": "2026-02-01"
+  },
+  {
+    "placeId": "ChIJO5zViwd0hlQRAFFNbhunA8Q",
+    "name": "Le March\u00e9 St. George",
+    "coffee": 3.5,
+    "matcha": 6.0,
+    "date": "2026-02-01"
+  },
+  {
+    "placeId": "ChIJrZUaoOFzhlQRm9cwZS-mgso",
+    "name": "The Federal Store Luncheonette & Grocer",
+    "coffee": 3.75,
+    "matcha": 6.25,
+    "date": "2026-02-01"
+  },
+  {
+    "placeId": "ChIJtZ1vTmVzhlQRKYtkWL3vwHs",
+    "name": "Foglifter Coffee Roasters",
+    "coffee": 3.3,
+    "matcha": 7.5,
+    "date": "2026-02-01"
+  },
+  {
+    "placeId": "ChIJ7yPsb0ZzhlQRNImVVhLe8tE",
+    "name": "Thierry Mount Pleasant",
+    "coffee": 4.95,
+    "matcha": 5.45,
+    "date": "2026-04-01"
+  },
+  {
+    "placeId": "ChIJtZ1vTmVzhlQRKYtkWL3vwHs",
+    "name": "Foglifter Coffee Roasters",
+    "coffee": 3.3,
+    "matcha": 7.4,
+    "date": "2026-05-01"
+  }
+];
+
+  // ============================================================
+  // Marker templates
+  // ============================================================
+  const matchaMarkerSVG = (price) => `
+    <svg viewBox="0 0 110 120" xmlns="http://www.w3.org/2000/svg">
+      <path d="M 25 50 L 30 95 Q 30 100 35 100 L 65 100 Q 70 100 70 95 L 75 50 Z"
+            fill="#F5E6D3" stroke="#8B6F47" stroke-width="2.5" stroke-linejoin="round"/>
+      <ellipse cx="50" cy="50" rx="25" ry="5" fill="#FFFFFF" stroke="#8B6F47" stroke-width="2.5"/>
+      <ellipse cx="50" cy="50" rx="21" ry="3.5" fill="#A8C97F"/>
+      <path d="M 75 60 Q 88 60 88 72 Q 88 84 75 84"
+            fill="none" stroke="#8B6F47" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M 42 35 Q 40 28 44 22 Q 48 16 44 10" fill="none" stroke="#B8D4EB" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+      <path d="M 52 35 Q 50 28 54 22 Q 58 16 54 10" fill="none" stroke="#B8D4EB" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+      <path d="M 62 35 Q 60 28 64 22 Q 68 16 64 10" fill="none" stroke="#B8D4EB" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+      <circle cx="80" cy="25" r="22" fill="#FFD4DC" stroke="#E89BAB" stroke-width="2"/>
+      <text x="80" y="25" font-family="Georgia, serif" font-size="11" font-weight="600"
+            fill="#8B4A5C" text-anchor="middle" dominant-baseline="central">${price}</text>
+    </svg>
+  `;
+
+  const coffeeMarkerSVG = (price) => `
+    <svg viewBox="0 0 110 120" xmlns="http://www.w3.org/2000/svg">
+      <path d="M 25 50 L 30 95 Q 30 100 35 100 L 65 100 Q 70 100 70 95 L 75 50 Z"
+            fill="#FFFFFF" stroke="#5C3A1E" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M 28 70 L 72 70 L 70 82 L 30 82 Z"
+            fill="#C89070" stroke="#5C3A1E" stroke-width="2" stroke-linejoin="round"/>
+      <ellipse cx="50" cy="50" rx="25" ry="5" fill="#3D2817" stroke="#5C3A1E" stroke-width="2.5"/>
+      <ellipse cx="50" cy="50" rx="21" ry="3.5" fill="#4A2C18"/>
+      <ellipse cx="50" cy="49" rx="15" ry="1.5" fill="#9B6B47" opacity="0.6"/>
+      <path d="M 42 35 Q 40 28 44 22 Q 48 16 44 10" fill="none" stroke="#B8D4EB" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+      <path d="M 52 35 Q 50 28 54 22 Q 58 16 54 10" fill="none" stroke="#B8D4EB" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+      <path d="M 62 35 Q 60 28 64 22 Q 68 16 64 10" fill="none" stroke="#B8D4EB" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+      <circle cx="80" cy="25" r="22" fill="#FFD4DC" stroke="#E89BAB" stroke-width="2"/>
+      <text x="80" y="25" font-family="Georgia, serif" font-size="11" font-weight="600"
+            fill="#8B4A5C" text-anchor="middle" dominant-baseline="central">${price}</text>
+    </svg>
+  `;
+
+  // ============================================================
+  // Layout: blue zones (avoid the roads), no-overlap placement
+  // ============================================================
+  const BLUE_ZONES = [
+    { xMin: 8, xMax: 38, yMin: 14, yMax: 40 },
+    { xMin: 62, xMax: 92, yMin: 14, yMax: 40 },
+    { xMin: 8, xMax: 38, yMin: 62, yMax: 92 },
+    { xMin: 62, xMax: 92, yMin: 62, yMax: 92 },
+  ];
+  const MIN_DISTANCE = 11;
+
+  function distance(a, b) {
+    return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
+  }
+
+  // Seeded "random" so each cafe always lands in the same spot.
+  // Uses placeId as the seed so positions are stable across renders.
+  function hashString(s) {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) {
+      h = ((h << 5) - h) + s.charCodeAt(i);
+      h |= 0;
+    }
+    return Math.abs(h);
+  }
+  function seededRandom(seed) {
+    // Simple LCG — good enough for picking positions
+    let s = seed;
+    return () => {
+      s = (s * 9301 + 49297) % 233280;
+      return s / 233280;
+    };
+  }
+
+  function positionForPlace(placeId, existingPositions) {
+    // Pick a zone deterministically based on the placeId
+    const rand = seededRandom(hashString(placeId));
+    const zoneIdx = Math.floor(rand() * BLUE_ZONES.length);
+    const zone = BLUE_ZONES[zoneIdx];
+
+    // Try up to 50 seeded "random" positions in that zone
+    let best = null, bestDist = -Infinity;
+    for (let i = 0; i < 50; i++) {
+      const candidate = {
+        x: zone.xMin + rand() * (zone.xMax - zone.xMin),
+        y: zone.yMin + rand() * (zone.yMax - zone.yMin),
+      };
+      if (existingPositions.length === 0) return candidate;
+      const minDist = Math.min(...existingPositions.map(p => distance(candidate, p)));
+      if (minDist >= MIN_DISTANCE) return candidate;
+      if (minDist > bestDist) {
+        bestDist = minDist;
+        best = candidate;
+      }
+    }
+    return best;
+  }
+
+  // ============================================================
+  // For a given year: find the most recent observation per cafe
+  // whose observation date is <= end of that year.
+  // ============================================================
+  function getCafesForYear(year) {
+    // Group observations by placeId, keep only the latest one <= year-end
+    const cutoff = `${year}-12-31`;
+    const latestByPlace = new Map();
+
+    for (const row of PRICE_DATA) {
+      if (row.date > cutoff) continue;  // observation is in the future
+      const existing = latestByPlace.get(row.placeId);
+      if (!existing || row.date > existing.date) {
+        latestByPlace.set(row.placeId, row);
+      }
+    }
+    return Array.from(latestByPlace.values());
+  }
+
+  // ============================================================
+  // Render
+  // ============================================================
+  function render(year) {
+    const cafes = getCafesForYear(year);
+    const layer = document.getElementById('markerLayer');
+    layer.innerHTML = '';
+
+    const placedPositions = [];
+
+    // We render TWO markers per cafe (matcha + coffee) if both exist.
+    // Pre-compute total to place them all without overlap.
+    const allMarkers = [];
+    for (const cafe of cafes) {
+      if (cafe.matcha != null) {
+        allMarkers.push({ cafe, type: 'matcha', price: cafe.matcha, seedKey: cafe.placeId + '_m' });
+      }
+      if (cafe.coffee != null) {
+        allMarkers.push({ cafe, type: 'coffee', price: cafe.coffee, seedKey: cafe.placeId + '_c' });
+      }
+    }
+
+    for (const m of allMarkers) {
+      const pos = positionForPlace(m.seedKey, placedPositions);
+      if (!pos) continue;
+      placedPositions.push(pos);
+
+      const div = document.createElement('div');
+      div.className = 'marker';
+      div.style.left = `${pos.x}%`;
+      div.style.top = `${pos.y}%`;
+      const priceLabel = `$${m.price.toFixed(2)}`;
+      div.innerHTML = (m.type === 'matcha' ? matchaMarkerSVG(priceLabel) : coffeeMarkerSVG(priceLabel))
+        + `<div class="tooltip">${m.cafe.name}</div>`;
+      layer.appendChild(div);
+    }
+
+    // Counts and averages
+    const matchaPrices = cafes.map(c => c.matcha).filter(p => p != null);
+    const coffeePrices = cafes.map(c => c.coffee).filter(p => p != null);
+    const avg = arr => arr.length
+      ? `$${(arr.reduce((s, p) => s + p, 0) / arr.length).toFixed(2)}`
+      : '$—';
+
+    document.getElementById('avgMatcha').textContent = avg(matchaPrices);
+    document.getElementById('avgCoffee').textContent = avg(coffeePrices);
+    document.getElementById('markerCount').textContent =
+      `${cafes.length} cafés · ${matchaPrices.length} matcha · ${coffeePrices.length} coffee`;
+  }
+
+  // ============================================================
+  // Wire up the slider
+  // ============================================================
+  const slider = document.getElementById('yearSlider');
+  const yearValue = document.getElementById('yearValue');
+
+  slider.addEventListener('input', () => {
+    const year = parseInt(slider.value, 10);
+    yearValue.textContent = year;
+    render(year);
+  });
+
+  render(parseInt(slider.value, 10));
+</script>
+
+</body>
+</html>
