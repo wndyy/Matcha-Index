@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Main Street, Vancouver — Matcha Index</title>
+<link href="https://unpkg.com/maplibre-gl@^4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
 <style>
   * { box-sizing: border-box; }
   body {
@@ -39,23 +40,29 @@
     overflow: hidden;
     box-shadow: 0 8px 32px rgba(90, 122, 149, 0.15);
   }
-  .map-background { width: 100%; height: 100%; display: block; }
-  .marker-layer { position: absolute; inset: 0; pointer-events: none; }
-  .marker-layer .marker {
-    position: absolute;
-    width: 70px;
-    transform: translate(-50%, -85%);
-    transition: transform 0.3s ease, opacity 0.3s ease;
-    pointer-events: auto;
-    cursor: pointer;
+  #map { width: 100%; height: 100%; }
+
+  /* MapLibre attribution — keep it visible (legal requirement) but unobtrusive */
+  .maplibregl-ctrl-attrib {
+    font-family: Georgia, serif;
+    font-size: 10px;
   }
-  .marker:hover {
-    transform: translate(-50%, -85%) scale(1.15);
+
+  /* The element MapLibre uses for each marker */
+  .price-marker {
+    width: 70px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    transform-origin: 50% 85%;
+    position: relative;
+  }
+  .price-marker:hover {
+    transform: scale(1.15);
     z-index: 10;
   }
-  .marker .tooltip {
+  .price-marker .tooltip {
     position: absolute;
-    bottom: 110%;
+    bottom: 100%;
     left: 50%;
     transform: translateX(-50%);
     background: #FFFFFF;
@@ -68,8 +75,9 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s ease;
+    font-family: Georgia, serif;
   }
-  .marker:hover .tooltip { opacity: 1; }
+  .price-marker:hover .tooltip { opacity: 1; }
 
   .controls {
     margin-top: 32px;
@@ -139,24 +147,7 @@
 <div class="subtitle">MATCHA &nbsp;·&nbsp; COFFEE</div>
 
 <div class="map-container">
-  <svg class="map-background" viewBox="0 0 1200 1200" preserveAspectRatio="xMidYMid slice"
-       xmlns="http://www.w3.org/2000/svg">
-    <rect width="1200" height="1200" fill="#D6E4F0"/>
-    <rect x="540" y="0" width="120" height="1200" fill="#A8C5DC"/>
-    <rect x="0" y="540" width="1200" height="120" fill="#A8C5DC"/>
-    <line x1="540" y1="0" x2="540" y2="1200" stroke="#8AAFCB" stroke-width="2"/>
-    <line x1="660" y1="0" x2="660" y2="1200" stroke="#8AAFCB" stroke-width="2"/>
-    <line x1="0" y1="540" x2="1200" y2="540" stroke="#8AAFCB" stroke-width="2"/>
-    <line x1="0" y1="660" x2="1200" y2="660" stroke="#8AAFCB" stroke-width="2"/>
-    <text x="600" y="600" font-family="Georgia, serif" font-size="22" font-weight="500"
-          letter-spacing="12" fill="#5A7A95" text-anchor="middle" dominant-baseline="middle"
-          transform="rotate(-90, 600, 600)">MAIN ST</text>
-    <text x="220" y="600" font-family="Georgia, serif" font-size="22" font-weight="500"
-          letter-spacing="3" fill="#5A7A95" text-anchor="middle" dominant-baseline="middle">
-      E KING EDWARD AVE
-    </text>
-  </svg>
-  <div class="marker-layer" id="markerLayer"></div>
+  <div id="map"></div>
 </div>
 
 <div class="controls">
@@ -194,443 +185,100 @@
   </div>
 </div>
 
+<script src="https://unpkg.com/maplibre-gl@^4.7.1/dist/maplibre-gl.js"></script>
 <script>
   // ============================================================
-  // YOUR REAL DATA — pasted from your CSV
-  // To update prices: edit this array, save, push to GitHub.
+  // PRICE DATA
   // ============================================================
   const PRICE_DATA = [
-  {
-    "placeId": "ChIJ7RQhju9zhlQR2Z0mfE2A_2E",
-    "name": "The Mighty Oak",
-    "coffee": 2.5,
-    "matcha": null,
-    "date": "2015-02-01"
-  },
-  {
-    "placeId": "ChIJyzUSdeNzhlQRkz3zRrw73Ow",
-    "name": "JJ Bean Coffee Roasters",
-    "coffee": 2.0,
-    "matcha": null,
-    "date": "2017-07-01"
-  },
-  {
-    "placeId": "ChIJrZUaoOFzhlQRm9cwZS-mgso",
-    "name": "The Federal Store Luncheonette & Grocer",
-    "coffee": 3.0,
-    "matcha": 4.75,
-    "date": "2018-04-01"
-  },
-  {
-    "placeId": "ChIJL7wlu-NzhlQR_WJtTl2Njvw",
-    "name": "54th Parallel Caf\u00e9 & Lucky's Doughnuts - Main Street",
-    "coffee": 2.35,
-    "matcha": null,
-    "date": "2018-12-01"
-  },
-  {
-    "placeId": "ChIJNdmgdPdzhlQRPR6J87ewKck",
-    "name": "Trafiq Cafe & Bakery",
-    "coffee": 1.95,
-    "matcha": null,
-    "date": "2019-11-01"
-  },
-  {
-    "placeId": "ChIJyzUSdeNzhlQRkz3zRrw73Ow",
-    "name": "JJ Bean Coffee Roasters",
-    "coffee": 2.5,
-    "matcha": 3.0,
-    "date": "2020-02-01"
-  },
-  {
-    "placeId": "ChIJL7wlu-NzhlQR_WJtTl2Njvw",
-    "name": "53rd Parallel Caf\u00e9 & Lucky's Doughnuts - Main Street",
-    "coffee": 3.35,
-    "matcha": null,
-    "date": "2020-03-01"
-  },
-  {
-    "placeId": "ChIJ7yPsb0ZzhlQRNImVVhLe8tE",
-    "name": "Thierry Mount Pleasant",
-    "coffee": 3.35,
-    "matcha": null,
-    "date": "2021-01-01"
-  },
-  {
-    "placeId": "ChIJO5zViwd0hlQRAFFNbhunA8Q",
-    "name": "Le March\u00e9 St. George",
-    "coffee": 2.98,
-    "matcha": 3.5,
-    "date": "2021-05-01"
-  },
-  {
-    "placeId": "ChIJtZ1vTmVzhlQRKYtkWL3vwHs",
-    "name": "Foglifter Coffee Roasters",
-    "coffee": 2.4,
-    "matcha": 5.5,
-    "date": "2021-07-01"
-  },
-  {
-    "placeId": "ChIJtZ1vTmVzhlQRKYtkWL3vwHs",
-    "name": "Foglifter Coffee Roasters",
-    "coffee": 2.4,
-    "matcha": 5.5,
-    "date": "2021-08-01"
-  },
-  {
-    "placeId": "ChIJ7RQhju9zhlQR2Z0mfE2A_2E",
-    "name": "The Mighty Oak",
-    "coffee": 3.25,
-    "matcha": 5.95,
-    "date": "2021-09-01"
-  },
-  {
-    "placeId": "ChIJO5zViwd0hlQRAFFNbhunA8Q",
-    "name": "Le March\u00e9 St. George",
-    "coffee": null,
-    "matcha": 3.65,
-    "date": "2021-10-01"
-  },
-  {
-    "placeId": "ChIJ7yPsb0ZzhlQRNImVVhLe8tE",
-    "name": "Thierry Mount Pleasant",
-    "coffee": 3.5,
-    "matcha": null,
-    "date": "2021-12-01"
-  },
-  {
-    "placeId": "ChIJl9I8XuNzhlQRAQr1-4RURPk",
-    "name": "Caffe Mira",
-    "coffee": 2.55,
-    "matcha": 4.85,
-    "date": "2022-02-01"
-  },
-  {
-    "placeId": "ChIJL7wlu-NzhlQR_WJtTl2Njvw",
-    "name": "52nd Parallel Caf\u00e9 & Lucky's Doughnuts - Main Street",
-    "coffee": 2.8,
-    "matcha": null,
-    "date": "2022-06-01"
-  },
-  {
-    "placeId": "ChIJsfgDqXtzhlQROoYf0PVhqPw",
-    "name": "Forecast Coffee",
-    "coffee": 3.25,
-    "matcha": 4.5,
-    "date": "2022-06-01"
-  },
-  {
-    "placeId": "ChIJR7sAXvdzhlQRSt1ypOZngjM",
-    "name": "Aperture Coffee Bar",
-    "coffee": 3.25,
-    "matcha": 4.75,
-    "date": "2022-07-01"
-  },
-  {
-    "placeId": "ChIJNdmgdPdzhlQRPR6J87ewKck",
-    "name": "Trafiq Cafe & Bakery",
-    "coffee": 2.75,
-    "matcha": null,
-    "date": "2022-07-01"
-  },
-  {
-    "placeId": "ChIJtZ1vTmVzhlQRKYtkWL3vwHs",
-    "name": "Foglifter Coffee Roasters",
-    "coffee": 2.7,
-    "matcha": 6.05,
-    "date": "2022-07-01"
-  },
-  {
-    "placeId": "ChIJl9I8XuNzhlQRAQr1-4RURPk",
-    "name": "Caffe Mira",
-    "coffee": null,
-    "matcha": 5.45,
-    "date": "2022-08-01"
-  },
-  {
-    "placeId": "ChIJL7wlu-NzhlQR_WJtTl2Njvw",
-    "name": "50th Parallel Caf\u00e9 & Lucky's Doughnuts - Main Street",
-    "coffee": 2.9,
-    "matcha": null,
-    "date": "2022-10-01"
-  },
-  {
-    "placeId": "ChIJ9emgfTZ1hlQRRUCs6rHblkM",
-    "name": "Breka Bakery & Caf\u00e9 - Main st",
-    "coffee": 2.5,
-    "matcha": null,
-    "date": "2022-11-01"
-  },
-  {
-    "placeId": "ChIJtZ1vTmVzhlQRKYtkWL3vwHs",
-    "name": "Foglifter Coffee Roasters",
-    "coffee": 2.7,
-    "matcha": 6.05,
-    "date": "2023-03-01"
-  },
-  {
-    "placeId": "ChIJL7wlu-NzhlQR_WJtTl2Njvw",
-    "name": "51st Parallel Caf\u00e9 & Lucky's Doughnuts - Main Street",
-    "coffee": 3.0,
-    "matcha": null,
-    "date": "2023-04-01"
-  },
-  {
-    "placeId": "ChIJsfgDqXtzhlQROoYf0PVhqPw",
-    "name": "Forecast Coffee",
-    "coffee": 3.75,
-    "matcha": 5.0,
-    "date": "2023-04-01"
-  },
-  {
-    "placeId": "ChIJixK5WvpzhlQREm9WCjjDUbY",
-    "name": "Liberty Bakery + Caf\u00e9",
-    "coffee": 2.5,
-    "matcha": 5.25,
-    "date": "2023-04-01"
-  },
-  {
-    "placeId": "ChIJ7RQhju9zhlQR2Z0mfE2A_2E",
-    "name": "The Mighty Oak",
-    "coffee": 3.75,
-    "matcha": 6.25,
-    "date": "2023-08-01"
-  },
-  {
-    "placeId": "ChIJ7yPsb0ZzhlQRNImVVhLe8tE",
-    "name": "Thierry Mount Pleasant",
-    "coffee": 3.95,
-    "matcha": 4.5,
-    "date": "2023-10-01"
-  },
-  {
-    "placeId": "ChIJtZ1vTmVzhlQRKYtkWL3vwHs",
-    "name": "Foglifter Coffee Roasters",
-    "coffee": 2.95,
-    "matcha": 6.65,
-    "date": "2023-10-01"
-  },
-  {
-    "placeId": "ChIJ7yPsb0ZzhlQRNImVVhLe8tE",
-    "name": "Thierry Mount Pleasant",
-    "coffee": 4.45,
-    "matcha": 4.95,
-    "date": "2024-05-01"
-  },
-  {
-    "placeId": "ChIJl9I8XuNzhlQRAQr1-4RURPk",
-    "name": "Caffe Mira",
-    "coffee": 2.65,
-    "matcha": 5.65,
-    "date": "2024-05-01"
-  },
-  {
-    "placeId": "ChIJ7RQhju9zhlQR2Z0mfE2A_2E",
-    "name": "The Mighty Oak",
-    "coffee": 3.75,
-    "matcha": 6.25,
-    "date": "2024-05-01"
-  },
-  {
-    "placeId": "ChIJO5zViwd0hlQRAFFNbhunA8Q",
-    "name": "Le March\u00e9 St. George",
-    "coffee": 3.0,
-    "matcha": 4.75,
-    "date": "2024-06-01"
-  },
-  {
-    "placeId": "ChIJyzUSdeNzhlQRkz3zRrw73Ow",
-    "name": "JJ Bean Coffee Roasters",
-    "coffee": 3.05,
-    "matcha": 5.2,
-    "date": "2024-07-01"
-  },
-  {
-    "placeId": "ChIJ7RQhju9zhlQR2Z0mfE2A_2E",
-    "name": "The Mighty Oak",
-    "coffee": 3.9,
-    "matcha": 6.25,
-    "date": "2024-07-01"
-  },
-  {
-    "placeId": "ChIJl9I8XuNzhlQRAQr1-4RURPk",
-    "name": "Caffe Mira",
-    "coffee": 3.0,
-    "matcha": 5.8,
-    "date": "2024-10-01"
-  },
-  {
-    "placeId": "ChIJmaXZ_KhxhlQRLi-vU-PIKUw",
-    "name": "Mercato di Luigi Mount Pleasant",
-    "coffee": 3.0,
-    "matcha": null,
-    "date": "2024-10-01"
-  },
-  {
-    "placeId": "ChIJNdmgdPdzhlQRPR6J87ewKck",
-    "name": "Trafiq Cafe & Bakery",
-    "coffee": 3.75,
-    "matcha": null,
-    "date": "2024-11-01"
-  },
-  {
-    "placeId": "ChIJtZ1vTmVzhlQRKYtkWL3vwHs",
-    "name": "Foglifter Coffee Roasters",
-    "coffee": 3.1,
-    "matcha": 7.0,
-    "date": "2024-11-01"
-  },
-  {
-    "placeId": "ChIJsfgDqXtzhlQROoYf0PVhqPw",
-    "name": "Forecast Coffee",
-    "coffee": 4.0,
-    "matcha": 6.2,
-    "date": "2025-01-01"
-  },
-  {
-    "placeId": "ChIJIboWjC5zhlQR_gjGB_hf8to",
-    "name": "Mishmish",
-    "coffee": 3.0,
-    "matcha": null,
-    "date": "2025-01-01"
-  },
-  {
-    "placeId": "ChIJn-m1c5lzhlQRzCO9ALp_kFA",
-    "name": "Slo Coffee Fraser St.",
-    "coffee": 3.5,
-    "matcha": 6.05,
-    "date": "2025-02-01"
-  },
-  {
-    "placeId": "ChIJ7RQhju9zhlQR2Z0mfE2A_2E",
-    "name": "The Mighty Oak",
-    "coffee": 3.9,
-    "matcha": 6.25,
-    "date": "2025-02-01"
-  },
-  {
-    "placeId": "ChIJtZ1vTmVzhlQRKYtkWL3vwHs",
-    "name": "Foglifter Coffee Roasters",
-    "coffee": 3.1,
-    "matcha": 7.0,
-    "date": "2025-03-01"
-  },
-  {
-    "placeId": "ChIJR7sAXvdzhlQRSt1ypOZngjM",
-    "name": "Aperture Coffee Bar",
-    "coffee": 3.75,
-    "matcha": 5.25,
-    "date": "2025-04-01"
-  },
-  {
-    "placeId": "ChIJL7wlu-NzhlQR_WJtTl2Njvw",
-    "name": "49th Parallel Caf\u00e9 & Lucky's Doughnuts - Main Street",
-    "coffee": 3.5,
-    "matcha": null,
-    "date": "2025-06-01"
-  },
-  {
-    "placeId": "ChIJrZUaoOFzhlQRm9cwZS-mgso",
-    "name": "The Federal Store Luncheonette & Grocer",
-    "coffee": 3.25,
-    "matcha": 5.75,
-    "date": "2025-06-01"
-  },
-  {
-    "placeId": "ChIJ9emgfTZ1hlQRRUCs6rHblkM",
-    "name": "Breka Bakery & Caf\u00e9 - Main st",
-    "coffee": 2.75,
-    "matcha": 4.5,
-    "date": "2025-07-01"
-  },
-  {
-    "placeId": "ChIJO5zViwd0hlQRAFFNbhunA8Q",
-    "name": "Le March\u00e9 St. George",
-    "coffee": 3.25,
-    "matcha": 5.75,
-    "date": "2025-07-01"
-  },
-  {
-    "placeId": "ChIJNdmgdPdzhlQRPR6J87ewKck",
-    "name": "Trafiq Cafe & Bakery",
-    "coffee": 4.5,
-    "matcha": null,
-    "date": "2025-08-01"
-  },
-  {
-    "placeId": "ChIJIboWjC5zhlQR_gjGB_hf8to",
-    "name": "Mishmish",
-    "coffee": 3.5,
-    "matcha": null,
-    "date": "2025-08-01"
-  },
-  {
-    "placeId": "ChIJl9I8XuNzhlQRAQr1-4RURPk",
-    "name": "Caffe Mira",
-    "coffee": 3.0,
-    "matcha": 6.2,
-    "date": "2025-09-01"
-  },
-  {
-    "placeId": "ChIJn-m1c5lzhlQRzCO9ALp_kFA",
-    "name": "Slo Coffee Fraser St.",
-    "coffee": 3.65,
-    "matcha": 7.0,
-    "date": "2025-12-01"
-  },
-  {
-    "placeId": "ChIJmaXZ_KhxhlQRLi-vU-PIKUw",
-    "name": "Mercato di Luigi Mount Pleasant",
-    "coffee": 3.0,
-    "matcha": null,
-    "date": "2026-01-01"
-  },
-  {
-    "placeId": "ChIJ9emgfTZ1hlQRRUCs6rHblkM",
-    "name": "Breka Bakery & Caf\u00e9 - Main st",
-    "coffee": 3.0,
-    "matcha": 4.75,
-    "date": "2026-02-01"
-  },
-  {
-    "placeId": "ChIJO5zViwd0hlQRAFFNbhunA8Q",
-    "name": "Le March\u00e9 St. George",
-    "coffee": 3.5,
-    "matcha": 6.0,
-    "date": "2026-02-01"
-  },
-  {
-    "placeId": "ChIJrZUaoOFzhlQRm9cwZS-mgso",
-    "name": "The Federal Store Luncheonette & Grocer",
-    "coffee": 3.75,
-    "matcha": 6.25,
-    "date": "2026-02-01"
-  },
-  {
-    "placeId": "ChIJtZ1vTmVzhlQRKYtkWL3vwHs",
-    "name": "Foglifter Coffee Roasters",
-    "coffee": 3.3,
-    "matcha": 7.5,
-    "date": "2026-02-01"
-  },
-  {
-    "placeId": "ChIJ7yPsb0ZzhlQRNImVVhLe8tE",
-    "name": "Thierry Mount Pleasant",
-    "coffee": 4.95,
-    "matcha": 5.45,
-    "date": "2026-04-01"
-  },
-  {
-    "placeId": "ChIJtZ1vTmVzhlQRKYtkWL3vwHs",
-    "name": "Foglifter Coffee Roasters",
-    "coffee": 3.3,
-    "matcha": 7.4,
-    "date": "2026-05-01"
-  }
-];
+    { placeId: "ChIJ7RQhju9zhlQR2Z0mfE2A_2E", name: "The Mighty Oak", coffee: 2.5, matcha: null, date: "2015-02-01" },
+    { placeId: "ChIJyzUSdeNzhlQRkz3zRrw73Ow", name: "JJ Bean Coffee Roasters", coffee: 2.0, matcha: null, date: "2017-07-01" },
+    { placeId: "ChIJrZUaoOFzhlQRm9cwZS-mgso", name: "The Federal Store Luncheonette & Grocer", coffee: 3.0, matcha: 4.75, date: "2018-04-01" },
+    { placeId: "ChIJL7wlu-NzhlQR_WJtTl2Njvw", name: "49th Parallel Café & Lucky's Doughnuts - Main Street", coffee: 2.35, matcha: null, date: "2018-12-01" },
+    { placeId: "ChIJNdmgdPdzhlQRPR6J87ewKck", name: "Trafiq Cafe & Bakery", coffee: 1.95, matcha: null, date: "2019-11-01" },
+    { placeId: "ChIJyzUSdeNzhlQRkz3zRrw73Ow", name: "JJ Bean Coffee Roasters", coffee: 2.5, matcha: 3.0, date: "2020-02-01" },
+    { placeId: "ChIJL7wlu-NzhlQR_WJtTl2Njvw", name: "49th Parallel Café & Lucky's Doughnuts - Main Street", coffee: 3.35, matcha: null, date: "2020-03-01" },
+    { placeId: "ChIJ7yPsb0ZzhlQRNImVVhLe8tE", name: "Thierry Mount Pleasant", coffee: 3.35, matcha: null, date: "2021-01-01" },
+    { placeId: "ChIJO5zViwd0hlQRAFFNbhunA8Q", name: "Le Marché St. George", coffee: 2.98, matcha: 3.5, date: "2021-05-01" },
+    { placeId: "ChIJtZ1vTmVzhlQRKYtkWL3vwHs", name: "Foglifter Coffee Roasters", coffee: 2.4, matcha: 5.5, date: "2021-07-01" },
+    { placeId: "ChIJtZ1vTmVzhlQRKYtkWL3vwHs", name: "Foglifter Coffee Roasters", coffee: 2.4, matcha: 5.5, date: "2021-08-01" },
+    { placeId: "ChIJ7RQhju9zhlQR2Z0mfE2A_2E", name: "The Mighty Oak", coffee: 3.25, matcha: 5.95, date: "2021-09-01" },
+    { placeId: "ChIJO5zViwd0hlQRAFFNbhunA8Q", name: "Le Marché St. George", coffee: null, matcha: 3.65, date: "2021-10-01" },
+    { placeId: "ChIJ7yPsb0ZzhlQRNImVVhLe8tE", name: "Thierry Mount Pleasant", coffee: 3.5, matcha: null, date: "2021-12-01" },
+    { placeId: "ChIJl9I8XuNzhlQRAQr1-4RURPk", name: "Caffe Mira", coffee: 2.55, matcha: 4.85, date: "2022-02-01" },
+    { placeId: "ChIJL7wlu-NzhlQR_WJtTl2Njvw", name: "49th Parallel Café & Lucky's Doughnuts - Main Street", coffee: 2.8, matcha: null, date: "2022-06-01" },
+    { placeId: "ChIJsfgDqXtzhlQROoYf0PVhqPw", name: "Forecast Coffee", coffee: 3.25, matcha: 4.5, date: "2022-06-01" },
+    { placeId: "ChIJR7sAXvdzhlQRSt1ypOZngjM", name: "Aperture Coffee Bar", coffee: 3.25, matcha: 4.75, date: "2022-07-01" },
+    { placeId: "ChIJNdmgdPdzhlQRPR6J87ewKck", name: "Trafiq Cafe & Bakery", coffee: 2.75, matcha: null, date: "2022-07-01" },
+    { placeId: "ChIJtZ1vTmVzhlQRKYtkWL3vwHs", name: "Foglifter Coffee Roasters", coffee: 2.7, matcha: 6.05, date: "2022-07-01" },
+    { placeId: "ChIJl9I8XuNzhlQRAQr1-4RURPk", name: "Caffe Mira", coffee: null, matcha: 5.45, date: "2022-08-01" },
+    { placeId: "ChIJL7wlu-NzhlQR_WJtTl2Njvw", name: "49th Parallel Café & Lucky's Doughnuts - Main Street", coffee: 2.9, matcha: null, date: "2022-10-01" },
+    { placeId: "ChIJ9emgfTZ1hlQRRUCs6rHblkM", name: "Breka Bakery & Café - Main st", coffee: 2.5, matcha: null, date: "2022-11-01" },
+    { placeId: "ChIJtZ1vTmVzhlQRKYtkWL3vwHs", name: "Foglifter Coffee Roasters", coffee: 2.7, matcha: 6.05, date: "2023-03-01" },
+    { placeId: "ChIJL7wlu-NzhlQR_WJtTl2Njvw", name: "49th Parallel Café & Lucky's Doughnuts - Main Street", coffee: 3.0, matcha: null, date: "2023-04-01" },
+    { placeId: "ChIJsfgDqXtzhlQROoYf0PVhqPw", name: "Forecast Coffee", coffee: 3.75, matcha: 5.0, date: "2023-04-01" },
+    { placeId: "ChIJixK5WvpzhlQREm9WCjjDUbY", name: "Liberty Bakery + Café", coffee: 2.5, matcha: 5.25, date: "2023-04-01" },
+    { placeId: "ChIJ7RQhju9zhlQR2Z0mfE2A_2E", name: "The Mighty Oak", coffee: 3.75, matcha: 6.25, date: "2023-08-01" },
+    { placeId: "ChIJ7yPsb0ZzhlQRNImVVhLe8tE", name: "Thierry Mount Pleasant", coffee: 3.95, matcha: 4.5, date: "2023-10-01" },
+    { placeId: "ChIJtZ1vTmVzhlQRKYtkWL3vwHs", name: "Foglifter Coffee Roasters", coffee: 2.95, matcha: 6.65, date: "2023-10-01" },
+    { placeId: "ChIJ7yPsb0ZzhlQRNImVVhLe8tE", name: "Thierry Mount Pleasant", coffee: 4.45, matcha: 4.95, date: "2024-05-01" },
+    { placeId: "ChIJl9I8XuNzhlQRAQr1-4RURPk", name: "Caffe Mira", coffee: 2.65, matcha: 5.65, date: "2024-05-01" },
+    { placeId: "ChIJ7RQhju9zhlQR2Z0mfE2A_2E", name: "The Mighty Oak", coffee: 3.75, matcha: 6.25, date: "2024-05-01" },
+    { placeId: "ChIJO5zViwd0hlQRAFFNbhunA8Q", name: "Le Marché St. George", coffee: 3.0, matcha: 4.75, date: "2024-06-01" },
+    { placeId: "ChIJyzUSdeNzhlQRkz3zRrw73Ow", name: "JJ Bean Coffee Roasters", coffee: 3.05, matcha: 5.2, date: "2024-07-01" },
+    { placeId: "ChIJ7RQhju9zhlQR2Z0mfE2A_2E", name: "The Mighty Oak", coffee: 3.9, matcha: 6.25, date: "2024-07-01" },
+    { placeId: "ChIJl9I8XuNzhlQRAQr1-4RURPk", name: "Caffe Mira", coffee: 3.0, matcha: 5.8, date: "2024-10-01" },
+    { placeId: "ChIJmaXZ_KhxhlQRLi-vU-PIKUw", name: "Mercato di Luigi Mount Pleasant", coffee: 3.0, matcha: null, date: "2024-10-01" },
+    { placeId: "ChIJNdmgdPdzhlQRPR6J87ewKck", name: "Trafiq Cafe & Bakery", coffee: 3.75, matcha: null, date: "2024-11-01" },
+    { placeId: "ChIJtZ1vTmVzhlQRKYtkWL3vwHs", name: "Foglifter Coffee Roasters", coffee: 3.1, matcha: 7.0, date: "2024-11-01" },
+    { placeId: "ChIJsfgDqXtzhlQROoYf0PVhqPw", name: "Forecast Coffee", coffee: 4.0, matcha: 6.2, date: "2025-01-01" },
+    { placeId: "ChIJIboWjC5zhlQR_gjGB_hf8to", name: "Mishmish", coffee: 3.0, matcha: null, date: "2025-01-01" },
+    { placeId: "ChIJn-m1c5lzhlQRzCO9ALp_kFA", name: "Slo Coffee Fraser St.", coffee: 3.5, matcha: 6.05, date: "2025-02-01" },
+    { placeId: "ChIJ7RQhju9zhlQR2Z0mfE2A_2E", name: "The Mighty Oak", coffee: 3.9, matcha: 6.25, date: "2025-02-01" },
+    { placeId: "ChIJtZ1vTmVzhlQRKYtkWL3vwHs", name: "Foglifter Coffee Roasters", coffee: 3.1, matcha: 7.0, date: "2025-03-01" },
+    { placeId: "ChIJR7sAXvdzhlQRSt1ypOZngjM", name: "Aperture Coffee Bar", coffee: 3.75, matcha: 5.25, date: "2025-04-01" },
+    { placeId: "ChIJL7wlu-NzhlQR_WJtTl2Njvw", name: "49th Parallel Café & Lucky's Doughnuts - Main Street", coffee: 3.5, matcha: null, date: "2025-06-01" },
+    { placeId: "ChIJrZUaoOFzhlQRm9cwZS-mgso", name: "The Federal Store Luncheonette & Grocer", coffee: 3.25, matcha: 5.75, date: "2025-06-01" },
+    { placeId: "ChIJ9emgfTZ1hlQRRUCs6rHblkM", name: "Breka Bakery & Café - Main st", coffee: 2.75, matcha: 4.5, date: "2025-07-01" },
+    { placeId: "ChIJO5zViwd0hlQRAFFNbhunA8Q", name: "Le Marché St. George", coffee: 3.25, matcha: 5.75, date: "2025-07-01" },
+    { placeId: "ChIJNdmgdPdzhlQRPR6J87ewKck", name: "Trafiq Cafe & Bakery", coffee: 4.5, matcha: null, date: "2025-08-01" },
+    { placeId: "ChIJIboWjC5zhlQR_gjGB_hf8to", name: "Mishmish", coffee: 3.5, matcha: null, date: "2025-08-01" },
+    { placeId: "ChIJl9I8XuNzhlQRAQr1-4RURPk", name: "Caffe Mira", coffee: 3.0, matcha: 6.2, date: "2025-09-01" },
+    { placeId: "ChIJn-m1c5lzhlQRzCO9ALp_kFA", name: "Slo Coffee Fraser St.", coffee: 3.65, matcha: 7.0, date: "2025-12-01" },
+    { placeId: "ChIJmaXZ_KhxhlQRLi-vU-PIKUw", name: "Mercato di Luigi Mount Pleasant", coffee: 3.0, matcha: null, date: "2026-01-01" },
+    { placeId: "ChIJ9emgfTZ1hlQRRUCs6rHblkM", name: "Breka Bakery & Café - Main st", coffee: 3.0, matcha: 4.75, date: "2026-02-01" },
+    { placeId: "ChIJO5zViwd0hlQRAFFNbhunA8Q", name: "Le Marché St. George", coffee: 3.5, matcha: 6.0, date: "2026-02-01" },
+    { placeId: "ChIJrZUaoOFzhlQRm9cwZS-mgso", name: "The Federal Store Luncheonette & Grocer", coffee: 3.75, matcha: 6.25, date: "2026-02-01" },
+    { placeId: "ChIJtZ1vTmVzhlQRKYtkWL3vwHs", name: "Foglifter Coffee Roasters", coffee: 3.3, matcha: 7.5, date: "2026-02-01" },
+    { placeId: "ChIJ7yPsb0ZzhlQRNImVVhLe8tE", name: "Thierry Mount Pleasant", coffee: 4.95, matcha: 5.45, date: "2026-04-01" },
+    { placeId: "ChIJtZ1vTmVzhlQRKYtkWL3vwHs", name: "Foglifter Coffee Roasters", coffee: 3.3, matcha: 7.4, date: "2026-05-01" },
+  ];
 
   // ============================================================
-  // Marker templates
+  // REAL COORDINATES, extracted from your CSV
+  // [lng, lat] — note the order, GeoJSON convention
+  // ============================================================
+  const PLACE_COORDS = {
+    "ChIJ9emgfTZ1hlQRRUCs6rHblkM": [-123.1009639, 49.2438398], // Breka Bakery & Café - Main st
+    "ChIJn-m1c5lzhlQRzCO9ALp_kFA": [-123.0899822, 49.2480315], // Slo Coffee Fraser St.
+    "ChIJO5zViwd0hlQRAFFNbhunA8Q": [-123.0944347, 49.2457667], // Le Marché St. George
+    "ChIJR7sAXvdzhlQRSt1ypOZngjM": [-123.1008973, 49.2484508], // Aperture Coffee Bar
+    "ChIJ7yPsb0ZzhlQRNImVVhLe8tE": [-123.099849,  49.2620964], // Thierry Mount Pleasant
+    "ChIJL7wlu-NzhlQR_WJtTl2Njvw": [-123.1007927, 49.2591539], // 49th Parallel Café & Lucky's Doughnuts
+    "ChIJsfgDqXtzhlQROoYf0PVhqPw": [-123.1009593, 49.2584876], // Forecast Coffee
+    "ChIJrZUaoOFzhlQRm9cwZS-mgso": [-123.1032786, 49.2619028], // The Federal Store
+    "ChIJyzUSdeNzhlQRkz3zRrw73Ow": [-123.1009,    49.258272 ], // JJ Bean Coffee Roasters
+    "ChIJNdmgdPdzhlQRPR6J87ewKck": [-123.1009045, 49.2473288], // Trafiq Cafe & Bakery
+    "ChIJtZ1vTmVzhlQRKYtkWL3vwHs": [-123.1007379, 49.2531182], // Foglifter Coffee Roasters
+    "ChIJIboWjC5zhlQR_gjGB_hf8to": [-123.0902091, 49.2538644], // Mishmish
+    "ChIJl9I8XuNzhlQRAQr1-4RURPk": [-123.1010004, 49.2568449], // Caffe Mira
+    "ChIJmaXZ_KhxhlQRLi-vU-PIKUw": [-123.0913208, 49.2595184], // Mercato di Luigi
+    "ChIJixK5WvpzhlQREm9WCjjDUbY": [-123.1012221, 49.251916 ], // Liberty Bakery + Café
+    "ChIJ7RQhju9zhlQR2Z0mfE2A_2E": [-123.1096174, 49.2545595], // The Mighty Oak
+  };
+
+  // ============================================================
+  // Marker SVG templates — UNCHANGED from your version
   // ============================================================
   const matchaMarkerSVG = (price) => `
     <svg viewBox="0 0 110 120" xmlns="http://www.w3.org/2000/svg">
@@ -668,74 +316,23 @@
   `;
 
   // ============================================================
-  // Layout: blue zones (avoid the roads), no-overlap placement
+  // Map setup
   // ============================================================
-  const BLUE_ZONES = [
-    { xMin: 8, xMax: 38, yMin: 14, yMax: 40 },
-    { xMin: 62, xMax: 92, yMin: 14, yMax: 40 },
-    { xMin: 8, xMax: 38, yMin: 62, yMax: 92 },
-    { xMin: 62, xMax: 92, yMin: 62, yMax: 92 },
-  ];
-  const MIN_DISTANCE = 11;
+  const map = new maplibregl.Map({
+    container: 'map',
+    style: 'https://tiles.openfreemap.org/styles/positron',
+    center: [-123.0998, 49.2530],
+    zoom: 13.5,
+  });
 
-  function distance(a, b) {
-    return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
-  }
+  let activeMarkers = [];
 
-  // Seeded "random" so each cafe always lands in the same spot.
-  // Uses placeId as the seed so positions are stable across renders.
-  function hashString(s) {
-    let h = 0;
-    for (let i = 0; i < s.length; i++) {
-      h = ((h << 5) - h) + s.charCodeAt(i);
-      h |= 0;
-    }
-    return Math.abs(h);
-  }
-  function seededRandom(seed) {
-    // Simple LCG — good enough for picking positions
-    let s = seed;
-    return () => {
-      s = (s * 9301 + 49297) % 233280;
-      return s / 233280;
-    };
-  }
-
-  function positionForPlace(placeId, existingPositions) {
-    // Pick a zone deterministically based on the placeId
-    const rand = seededRandom(hashString(placeId));
-    const zoneIdx = Math.floor(rand() * BLUE_ZONES.length);
-    const zone = BLUE_ZONES[zoneIdx];
-
-    // Try up to 50 seeded "random" positions in that zone
-    let best = null, bestDist = -Infinity;
-    for (let i = 0; i < 50; i++) {
-      const candidate = {
-        x: zone.xMin + rand() * (zone.xMax - zone.xMin),
-        y: zone.yMin + rand() * (zone.yMax - zone.yMin),
-      };
-      if (existingPositions.length === 0) return candidate;
-      const minDist = Math.min(...existingPositions.map(p => distance(candidate, p)));
-      if (minDist >= MIN_DISTANCE) return candidate;
-      if (minDist > bestDist) {
-        bestDist = minDist;
-        best = candidate;
-      }
-    }
-    return best;
-  }
-
-  // ============================================================
-  // For a given year: find the most recent observation per cafe
-  // whose observation date is <= end of that year.
-  // ============================================================
+  // Find the most recent observation per café up to year-end
   function getCafesForYear(year) {
-    // Group observations by placeId, keep only the latest one <= year-end
     const cutoff = `${year}-12-31`;
     const latestByPlace = new Map();
-
     for (const row of PRICE_DATA) {
-      if (row.date > cutoff) continue;  // observation is in the future
+      if (row.date > cutoff) continue;
       const existing = latestByPlace.get(row.placeId);
       if (!existing || row.date > existing.date) {
         latestByPlace.set(row.placeId, row);
@@ -744,44 +341,48 @@
     return Array.from(latestByPlace.values());
   }
 
-  // ============================================================
-  // Render
-  // ============================================================
+  function makeMarkerEl(svgFn, price, name) {
+    const el = document.createElement('div');
+    el.className = 'price-marker';
+    el.innerHTML = svgFn(`$${price.toFixed(2)}`)
+      + `<div class="tooltip">${name}</div>`;
+    return el;
+  }
+
   function render(year) {
+    // Clear previous markers
+    activeMarkers.forEach(m => m.remove());
+    activeMarkers = [];
+
     const cafes = getCafesForYear(year);
-    const layer = document.getElementById('markerLayer');
-    layer.innerHTML = '';
 
-    const placedPositions = [];
-
-    // We render TWO markers per cafe (matcha + coffee) if both exist.
-    // Pre-compute total to place them all without overlap.
-    const allMarkers = [];
     for (const cafe of cafes) {
+      const coords = PLACE_COORDS[cafe.placeId];
+      if (!coords) {
+        console.warn('No coords for', cafe.placeId, cafe.name);
+        continue;
+      }
+
+      // Matcha marker (offset slightly west so it doesn't overlap coffee)
       if (cafe.matcha != null) {
-        allMarkers.push({ cafe, type: 'matcha', price: cafe.matcha, seedKey: cafe.placeId + '_m' });
+        const el = makeMarkerEl(matchaMarkerSVG, cafe.matcha, cafe.name);
+        const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat([coords[0] - 0.0002, coords[1]])
+          .addTo(map);
+        activeMarkers.push(marker);
       }
+
+      // Coffee marker (offset slightly east)
       if (cafe.coffee != null) {
-        allMarkers.push({ cafe, type: 'coffee', price: cafe.coffee, seedKey: cafe.placeId + '_c' });
+        const el = makeMarkerEl(coffeeMarkerSVG, cafe.coffee, cafe.name);
+        const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat([coords[0] + 0.0002, coords[1]])
+          .addTo(map);
+        activeMarkers.push(marker);
       }
     }
 
-    for (const m of allMarkers) {
-      const pos = positionForPlace(m.seedKey, placedPositions);
-      if (!pos) continue;
-      placedPositions.push(pos);
-
-      const div = document.createElement('div');
-      div.className = 'marker';
-      div.style.left = `${pos.x}%`;
-      div.style.top = `${pos.y}%`;
-      const priceLabel = `$${m.price.toFixed(2)}`;
-      div.innerHTML = (m.type === 'matcha' ? matchaMarkerSVG(priceLabel) : coffeeMarkerSVG(priceLabel))
-        + `<div class="tooltip">${m.cafe.name}</div>`;
-      layer.appendChild(div);
-    }
-
-    // Counts and averages
+    // Averages and counts
     const matchaPrices = cafes.map(c => c.matcha).filter(p => p != null);
     const coffeePrices = cafes.map(c => c.coffee).filter(p => p != null);
     const avg = arr => arr.length
@@ -794,9 +395,7 @@
       `${cafes.length} cafés · ${matchaPrices.length} matcha · ${coffeePrices.length} coffee`;
   }
 
-  // ============================================================
-  // Wire up the slider
-  // ============================================================
+  // Slider wiring
   const slider = document.getElementById('yearSlider');
   const yearValue = document.getElementById('yearValue');
 
@@ -806,7 +405,10 @@
     render(year);
   });
 
-  render(parseInt(slider.value, 10));
+  // Wait for map style to load before adding markers
+  map.on('load', () => {
+    render(parseInt(slider.value, 10));
+  });
 </script>
 
 </body>
